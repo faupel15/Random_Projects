@@ -1,0 +1,412 @@
+---
+title: "SMB-A - Sports Analytics Final Project"
+author: "Nick Faupel"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+options(scipen = 999)
+```
+
+
+
+
+### Load in libraries:
+```{r}
+library(tidyverse)
+#devtools::install_github("lbenz730/ncaahoopR")
+library(ncaahoopR)
+library(RColorBrewer)
+library(ggcorrplot)
+```
+
+
+
+
+### Import the data:
+```{r}
+
+#setwd("/Users/nfaupel/Library/CloudStorage/OneDrive-Personal/Desktop/OSU/SMB-A/Summer 2023/Sports Analytics/Final Project")
+
+# Read in data
+df <- readxl::read_xlsx("/Users/nfaupel/Library/CloudStorage/OneDrive-Personal/Desktop/OSU/SMB-A/Summer 2023/Sports Analytics/Final Project/NCAA_Tournaments14_23_V3.xlsx", sheet = "Data")
+
+# Remove ref_crew and arena variables
+df <- df %>% select(-c(ref_crew, arena))
+
+
+```
+
+
+
+### Initial Formatting
+
+```{r}
+
+
+# Remove nas
+df <- na.omit(df)
+
+
+# Format Fields
+df <- 
+  df %>% 
+  mutate(matchup = paste(away_seed, away_team, "vs.", home_seed, home_team, tourney_year),
+         date = date(date),
+         #tourney_year = double(tourney_year),
+         fouls = as.numeric(fouls),
+         avg_score_diff = abs(avg_score_diff),
+         play_length = as.numeric(play_length),
+         FT = as.numeric(FT),
+         threes = as.numeric(threes),
+         away_seed = factor(away_seed),
+         away_rank = factor(away_rank),
+         home_seed = factor(home_seed),
+         home_rank = factor(home_rank),
+         gei = as.numeric(gei),
+         round = factor(round),
+         round_name = factor(round_name, levels = c("Play-In", "Round of 64", "Round of 32", "Sweet 16", "Elite 8", "Final Four", "Championship")),
+         away_score = as.numeric(away_score),
+         home_score = as.numeric(home_score),
+         score_diff_end = as.numeric(score_diff_end),
+         abs_score_diff_end_range = abs(score_diff_end),
+         tot_score = as.numeric(tot_score),
+         game_seed_total = as.numeric(game_seed_total),
+         game_seed_diff = as.numeric(game_seed_diff),
+         outcome = factor(outcome))
+
+
+
+
+
+# add fields
+df <- df %>% 
+  mutate(tot_score_range = case_when(
+    tot_score < 100 ~ "<100",
+    tot_score >= 100 & tot_score < 114 ~ "100-114",
+    tot_score >= 115 & tot_score < 129 ~ "115-129",
+    tot_score >= 130 & tot_score < 144 ~ "130-144",
+    tot_score >= 145 & tot_score < 169 ~ "145-159",
+    tot_score >= 170 & tot_score < 184 ~ "160-174",
+    tot_score >= 185 & tot_score < 199 ~ "175-189",
+    .default = ">189"
+  ),
+  abs_score_diff_end_range = case_when(
+    abs_score_diff_end_range < 5 ~ "<5",
+    abs_score_diff_end_range >= 5 & abs_score_diff_end_range < 9 ~ "5-9",
+    abs_score_diff_end_range >= 10 & abs_score_diff_end_range < 14 ~ "10-14",
+    abs_score_diff_end_range >= 15 & abs_score_diff_end_range < 19 ~ "15-19",
+    abs_score_diff_end_range >= 20 & abs_score_diff_end_range < 24 ~ "20-24",
+    abs_score_diff_end_range >= 25 & abs_score_diff_end_range < 29 ~ "25-29",
+    .default = ">29"
+  ))
+
+# just numeric values
+num_vars <- df %>%
+  select(fouls, avg_score_diff, play_length, FT, threes, gei, away_score, home_score, score_diff_end, tot_score, game_seed_total, game_seed_diff)
+
+
+```
+
+
+
+### Histogram
+```{r}
+
+df %>% 
+  ggplot(aes(x = gei)) +
+  geom_histogram(color = "black", fill="orange") +
+  theme_bw() +
+  labs(x = "Game Excitement Index",
+       y = "",
+       title = "Distribution of Game Excitement Index",
+       subtitle = "NCAA Tournaments from 2014 - 2023")
+
+
+```
+
+
+
+
+
+
+
+### Sample
+
+```{r}
+
+df %>% 
+  select(matchup, round_name, winner, outcome, avg_score_diff, away_score, home_score, gei) %>% 
+  rename(Matchup = matchup, 
+         Round = round_name, 
+         MeanScoreDiff = avg_score_diff, 
+         AwayScore = away_score, 
+         HomeScore = home_score, 
+         Winner =winner, 
+         Outcome = outcome, 
+         GEI = gei) %>% 
+  arrange(desc(GEI)) %>% 
+  head(10) %>% 
+  knitr::kable()
+
+```
+
+
+
+
+
+
+
+
+### Top 10 and Bottom 10 GEI Bar Charts
+```{r}
+#Top 10 Games
+df %>% 
+  arrange(desc(gei)) %>% 
+  filter(gei > 7.7) %>% 
+  ggplot(aes(x = gei, y = reorder(matchup, gei))) + 
+  geom_col(aes(fill = round_name), color = "black") + 
+  labs(x = "Game Excitement Index",
+       y = "",
+       title = "Ten Most Exciting Games by GEI",
+       subtitle = "NCAA Tournaments from 2014 - 2023",
+       fill = "Round") + 
+  theme_bw()
+
+
+
+# Bottom 10 Games
+df %>%
+  arrange(desc(gei)) %>%
+  filter(gei < 0.14) %>%
+  ggplot(aes(x = gei, y = reorder(matchup, gei, decreasing = TRUE))) +
+  geom_col(aes(fill = round_name), color = "black") +
+  labs(x = "Game Excitement Index",
+       y = "",
+       title = "Ten Least Exciting Games by GEI",
+       subtitle = "NCAA Tournaments from 2014 - 2023",
+       fill = "Round") +
+  scale_fill_manual(values = "orange", guide = guide_legend()) +
+  theme_bw()
+
+
+
+```
+
+
+
+### chart of game
+```{r, message=FALSE}
+example_game_graph <- gg_wp_chart(game_id = 401522191, home_col = "purple", away_col = "darkgreen", show_labels = FALSE)
+
+example_game_graph +
+  labs(subtitle = "KSU: 98  MSU: 93 \n March 23, 2023 \n GEI = 9.77") +
+  geom_hline(yintercept = 0.5)
+
+```
+
+
+
+
+
+### Correlation matrix of numeric values
+```{r}
+
+
+cor_mat <- cor(num_vars)
+ggcorrplot(cor_mat, type = "lower", lab = TRUE, lab_size = 4) +
+  labs(title = "Correlation Matrix for Numeric Variables")
+
+
+
+```
+
+
+
+
+#### outcome boxplot
+```{r}
+
+df %>% 
+  ggplot(aes(x=outcome, y=gei)) +
+  geom_violin(aes(fill= outcome), width=1, show.legend = FALSE, alpha = 0.9) +
+  geom_boxplot(width=0.5, color="black", alpha=0.2) +
+  theme_bw() +
+  scale_fill_manual(values = c("orange", "blue"), guide = guide_legend()) +
+  labs(title = "Distribution of Game Excitement Index by Game Outcome",
+       subtitle = "NCAA Tournaments from 2014 - 2023",
+       y = "Game Excitement Index", 
+       x = "Outcome Type")
+
+
+```
+
+
+
+```{r}
+
+# scatterplot of avg score diff. vs GEI
+ggplot(df, aes(x=avg_score_diff, y=gei)) + 
+  geom_point() +
+  geom_smooth(method = "loess",  color = "orange") +
+  labs(
+    title = "Average Score Differential vs GEI",
+    subtitle = "NCAA Tournaments from 2014 - 2023",
+    y = "Game Excitement Index", 
+    x = "Average Score Differential Throughout Game"
+  ) +
+  theme_bw()
+
+```
+
+
+
+
+```{r}
+
+# scatterplot of seed diff. vs GEI
+df %>% 
+  filter(game_seed_diff >= 0) %>% 
+  ggplot(aes(x=game_seed_diff, y=gei)) + 
+  geom_point() +
+  geom_smooth(method = "lm",  color = "orange") +
+  labs(
+    title = "Matchup Seed Difference vs GEI",
+    subtitle = "NCAA Tournaments from 2014 - 2023",
+    y = "Game Excitement Index", 
+    x = "Matchup Seed Difference"
+  ) +
+  theme_bw()
+
+```
+
+
+
+
+```{r}
+
+# score diff
+df %>%
+  group_by(abs_score_diff_end_range) %>%
+  summarise(avg_gei = mean(gei)) %>%
+  ggplot(aes(x=factor(abs_score_diff_end_range, levels=c('<5', '5-9', '10-14', '15-19', '20-24', '25-29', '>29')), 
+                      y=avg_gei)) + 
+  geom_bar(stat = "identity", color = "black", fill = "orange", show.legend = FALSE) +
+    labs(
+    title = "Average GEI by Score Difference",
+    subtitle = "NCAA Tournaments from 2014 - 2023",
+    y = "Game Excitement Index", 
+    x = "Score Difference"
+  ) +
+  theme_bw()
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+# total score
+df %>%
+  group_by(tot_score_range) %>%
+  summarise(avg_gei = mean(gei)) %>%
+  ggplot(aes(x=factor(tot_score_range, levels=c('<100', '100-114', '115-129', '130-144', '145-159', '160-174', '175-189', '>189')), y=avg_gei)) + 
+  geom_bar(stat = "identity", color = "black", fill = "orange", show.legend = FALSE) +
+    labs(
+    title = "Average GEI by Total Points Scored",
+    subtitle = "NCAA Tournaments from 2014 - 2023",
+    y = "Game Excitement Index", 
+    x = "Total Points Scored"
+  ) +
+  theme_bw()
+
+
+
+```
+
+
+
+
+
+
+
+```{r, message=FALSE}
+
+
+# GEI by round
+df %>% 
+  group_by(round_name) %>% 
+  summarise(avg_gei = mean(gei)) %>% 
+  ggplot(aes(x=round_name, y=avg_gei)) +
+  geom_col(color = "black", fill = "orange", show.legend = FALSE) +
+  theme_bw() +
+  labs(title = "Average GEI by Round",
+       subtitle = "NCAA Tournaments from 2014 - 2023",
+       x = "Round",
+       y = "Average Game Excitement Index")
+  
+```
+
+
+
+
+
+```{r}
+
+
+# GEI by round and year
+df %>% 
+  mutate(year = format(as.Date(date, format="%d/%m/%Y"),"%Y"),
+         round = as.character(round),
+         round_int = as.integer(round),
+         year_int = as.integer(year)) %>%
+  group_by(round, round_int, year, year_int) %>%
+  summarise(avg_gei = mean(gei)) %>% 
+  ggplot(aes(x=round_int, y=avg_gei, color=year)) +
+    geom_line() +
+    geom_point() +
+    labs(
+      title = "Average GEI Over Time for Each Year by Round",
+      subtitle = "NCAA Tournaments from 2014 - 2023",
+      y = "Game Excitement Index", 
+      x = "Round"
+    ) +
+  theme_bw()
+
+```
+
+
+
+
+### Linear Regression
+```{r}
+#Fit a regression with all variables
+final_model <- lm(gei ~ FT + threes + avg_score_diff + play_length + away_seed + home_seed + round_name + score_diff_end + tot_score + outcome, data = df)
+
+summary(final_model)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
