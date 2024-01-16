@@ -1,2 +1,2 @@
 # Random_Projects
-Just code from random projects.
+These are a few snapshots of the projects I've worked on in the past. Some I did as for the purpose of learning on my own, while others were assignments during my time in school. Unfortunately, there are quite a few other projects I wish I could add here, but they involve sensitive or confidential data, so I can't share those publicly. I'm now working on some new projects that I'll be able to showcase my work, so stay tuned!
